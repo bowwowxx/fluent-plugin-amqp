@@ -15,6 +15,7 @@ class AmqpOutput < Fluent::BufferedOutput
   config_param :exchange_durable, :bool, default: true
   config_param :payload_only, :bool, default: false
   config_param :content_type, :string, default: "application/octet-stream"
+  config_param :queue_name, :string, default: "metadata"
 
   def initialize(*)
     super
@@ -81,6 +82,11 @@ class AmqpOutput < Fluent::BufferedOutput
     unless @amqp_channel && @amqp_channel.open?
       @amqp_channel  = @amqp_conn.create_channel
       @amqp_exchange = Bunny::Exchange.new(@amqp_channel, @exchange_type.to_sym, @exchange_name, durable: @exchange_durable)
+      input=queue_name.split(",")
+      input.each do |queuqname|
+        @amqp_queue = @amqp_channel.queue(queuqname, :durable => false)
+        @amqp_queue.bind(@amqp_exchange)
+      end
     end
 
     @amqp_exchange
