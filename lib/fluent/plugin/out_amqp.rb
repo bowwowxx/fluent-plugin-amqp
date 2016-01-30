@@ -13,7 +13,7 @@ class AmqpOutput < Fluent::BufferedOutput
   config_param :exchange, :string, default: ""
   config_param :exchange_type, :string, default: "topic"
   config_param :exchange_durable, :bool, default: true
-  config_param :payload_only, :bool, default: false
+  config_param :payload_only, :bool, default: true
   config_param :content_type, :string, default: "application/octet-stream"
   config_param :queue_name, :string, default: "metadata"
 
@@ -66,8 +66,10 @@ class AmqpOutput < Fluent::BufferedOutput
   # 'chunk.open {|io| ... }' to get IO objects.
   def write(chunk)
     chunk.msgpack_each do |(tag, time, record)|
-      event = @payload_only ? record : { "key" => tag, "timestamp" => time, "payload" => record }
-      get_or_create_exchange.publish Yajl.dump(event), routing_key: tag, content_type: @content_type
+      input=queue_name.split(",")
+      routkey=input.sample
+      event = @payload_only ? record : { "key" => routkey, "timestamp" => time, "payload" => record }
+      get_or_create_exchange.publish Yajl.dump(event), routing_key: routkey, content_type: @content_type
     end
   end
 
@@ -85,7 +87,7 @@ class AmqpOutput < Fluent::BufferedOutput
       input=queue_name.split(",")
       input.each do |queuqname|
         @amqp_queue = @amqp_channel.queue(queuqname, :durable => false)
-        @amqp_queue.bind(@amqp_exchange)
+        @amqp_queue.bind(@amqp_exchange, :routing_key => queuqname)
       end
     end
 
